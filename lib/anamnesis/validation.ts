@@ -1,4 +1,4 @@
-/** The values stored in anamnesis_answers.answer. */
+/** The values stored in anamnesis_answers.response. */
 export type Answer = string | number | boolean | string[] | null;
 export type QuestionKind = 'text' | 'number' | 'single_choice' | 'multiple_choice' | 'boolean';
 export type Question = { id: string; prompt: string; kind: QuestionKind; required: boolean; options: string[] };
@@ -29,4 +29,21 @@ export function validateAnswers(questions: Question[], answers: Record<string, u
     if (error) errors[question.id] = error;
   }
   return errors;
+}
+
+/** Convert completed numeric input at save time, preserving invalid input for validation. */
+export function prepareAnswers(questions: Question[], answers: Record<string, unknown>): Record<string, unknown> {
+  const prepared = { ...answers };
+  for (const question of questions) {
+    const answer = prepared[question.id];
+    if (question.kind !== 'number' || typeof answer !== 'string') continue;
+    const input = answer.trim();
+    if (!input) {
+      prepared[question.id] = null;
+    } else if (/^-?(?:\d+(?:[.,]\d+)?|[.,]\d+)$/.test(input)) {
+      const value = Number(input.replace(',', '.'));
+      if (Number.isFinite(value)) prepared[question.id] = value;
+    }
+  }
+  return prepared;
 }

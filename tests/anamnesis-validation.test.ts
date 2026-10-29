@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateAnswer, validateAnswers, type Question } from '../lib/anamnesis/validation';
+import { prepareAnswers, validateAnswer, validateAnswers, type Question } from '../lib/anamnesis/validation';
 
 const question = (kind: Question['kind'], required = true): Question => ({ id: kind, prompt: 'Pergunta sintética', kind, required, options: ['A', 'B'] });
 
@@ -23,4 +23,17 @@ describe('validação de anamnese', () => {
   it('associa mensagens aos identificadores das perguntas', () => {
     expect(validateAnswers([question('text'), question('boolean')], { boolean: false })).toEqual({ text: 'Esta resposta é obrigatória.' });
   });
+  it('converte números completos ao salvar, mantendo entradas incompletas para exibir erro', () => {
+    const questions = [question('number')];
+    for (const [input, expected] of [['-1,25', -1.25], ['0', 0], ['.5', 0.5], ['  ', null]] as const) {
+      expect(prepareAnswers(questions, { number: input }).number).toBe(expected);
+    }
+    for (const input of ['-', '1,', '1.2.3', 'Infinity', '1e3']) {
+      const prepared = prepareAnswers(questions, { number: input });
+      expect(prepared.number).toBe(input);
+      expect(validateAnswers(questions, prepared).number).toBeTruthy();
+    }
+    expect(prepareAnswers(questions, { number: 2 }).number).toBe(2);
+  });
+
 });
