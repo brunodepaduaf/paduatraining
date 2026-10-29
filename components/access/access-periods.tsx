@@ -1,0 +1,34 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, useColorScheme, View } from 'react-native';
+import { Button } from '@/components/ui';
+import { endOfLocalDay } from '@/lib/access-period';
+import { supabase } from '@/lib/supabase';
+import { palette } from '@/lib/theme';
+
+type Member = { profile_id: string; profiles: { full_name: string } | null };
+type Period = { id: string; status: 'active' | 'pending' | 'expired' | 'blocked'; starts_at: string; ends_at: string | null };
+type Status = 'active' | 'pending' | 'blocked';
+const labels: Record<Period['status'], string> = { active: 'Ativo', pending: 'Pendente', expired: 'Expirado', blocked: 'Bloqueado' };
+
+export function AccessPeriods({ org }: { org: string }) {
+ const colors = palette[useColorScheme() === 'dark' ? 'dark' : 'light']; const requestRef = useRef(0);
+ const [members, setMembers] = useState<Member[]>([]); const [target, setTarget] = useState<Member | null>(null); const [periods, setPeriods] = useState<Period[]>([]);
+ const [status, setStatus] = useState<Status>('active'); const [endDate, setEndDate] = useState(''); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState('');
+ const load = useCallback(async () => { setLoading(true); setError(''); const r = await supabase!.from('organization_members').select('profile_id,profiles(full_name)').eq('organization_id', org).eq('role', 'student').is('archived_at', null); if (r.error) setError('Não foi possível carregar os alunos.'); else setMembers(r.data as unknown as Member[]); setLoading(false); }, [org]);
+ useEffect(() => { void load(); }, [load]);
+ const open = async (member: Member) => { const request = ++requestRef.current; if (target?.profile_id !== member.profile_id) { setEndDate(''); setStatus('active'); } setTarget(member); setPeriods([]); setError(''); setMessage(''); setBusy(true); const r = await supabase!.from('access_periods').select('id,status,starts_at,ends_at').eq('organization_id', org).eq('student_id', member.profile_id).order('updated_at', { ascending: false }).order('created_at', { ascending: false }).limit(20); if (request !== requestRef.current) return; setBusy(false); if (r.error) { setError('Não foi possível carregar o histórico.'); return; } setPeriods(r.data as Period[]); };
+ const record = async () => { if (!target) return; const end = status === 'active' && endDate.trim() ? endOfLocalDay(endDate) : null; if (status === 'active' && endDate.trim() && (!end || Date.parse(end) <= Date.now())) { setError('Informe uma data futura válida no formato AAAA-MM-DD.'); return; } setBusy(true); setError(''); setMessage(''); const r = await supabase!.rpc('record_student_access', { target_organization: org, target_student: target.profile_id, new_status: status, end_at: end }); setBusy(false); if (r.error) { setError('Não foi possível registrar o acesso. Confira o vínculo do aluno e tente novamente.'); return; } setEndDate(''); await open(target); setMessage('Alteração de acesso registrada.'); };
+ const confirm = () => { if (!target) return; const text = `${labels[status]} para ${target.profiles?.full_name || 'este aluno'}${status === 'active' && endDate.trim() ? ` até ${endDate.trim()}` : ''}? A alteração vale imediatamente e é registrada na auditoria.`; if (Platform.OS === 'web') { if (globalThis.confirm(text)) void record(); } else Alert.alert('Alterar acesso?', text, [{ text: 'Cancelar', style: 'cancel' }, { text: 'Confirmar', onPress: () => void record() }]); };
+ return <>
+  <Text accessibilityRole="header" style={[styles.heading, { color: colors.textPrimary }]}>Acesso dos alunos</Text><Text style={[styles.body, { color: colors.textSecondary }]}>Cada alteração cria um período e mantém o histórico. O banco determina o acesso efetivo.</Text>
+  {loading || busy ? <ActivityIndicator accessibilityLabel="Carregando acessos" /> : null}{error ? <Text style={[styles.body, { color: colors.danger }]}>{error}</Text> : null}{message ? <Text accessibilityLiveRegion="polite" style={[styles.body, { color: colors.success }]}>{message}</Text> : null}
+  {!loading && members.length === 0 && !error ? <Text style={[styles.body, { color: colors.textSecondary }]}>Nenhum aluno disponível.</Text> : null}
+  {members.map(member => <Button key={member.profile_id} variant={target?.profile_id === member.profile_id ? 'primary' : 'secondary'} selected={target?.profile_id === member.profile_id} disabled={busy} onPress={() => void open(member)}>{member.profiles?.full_name || 'Aluno'} · {member.profile_id.slice(0, 8)}</Button>)}
+  {target ? <><Text style={[styles.label, { color: colors.textPrimary }]}>Aluno: {target.profiles?.full_name || 'Aluno'} · {target.profile_id.slice(0, 8)}</Text><Text style={[styles.body, { color: colors.textSecondary }]}>Escolha o novo estado.</Text>{(['active','pending','blocked'] as const).map(value => <Button key={value} variant={status === value ? 'primary' : 'secondary'} selected={status === value} disabled={busy} onPress={() => setStatus(value)}>{labels[value]}</Button>)}
+   {status === 'active' ? <View style={styles.field}><Text style={[styles.label, { color: colors.textPrimary }]}>Último dia de acesso (AAAA-MM-DD, opcional)</Text><TextInput accessibilityLabel="Último dia de acesso" editable={!busy} value={endDate} onChangeText={setEndDate} placeholder="AAAA-MM-DD" placeholderTextColor={colors.textSecondary} style={[styles.input, { color: colors.textPrimary, backgroundColor: colors.surfaceElevated, borderColor: colors.border }]} /></View> : null}
+   <Button disabled={busy} onPress={confirm}>Registrar alteração</Button><Text style={[styles.label, { color: colors.textPrimary }]}>Histórico recente</Text>{!busy && periods.length === 0 && !error ? <Text style={[styles.body, { color: colors.textSecondary }]}>Nenhum período registrado.</Text> : null}{periods.map(period => <Text key={period.id} style={[styles.body, { color: colors.textSecondary }]}>{labels[period.status]} · início {new Date(period.starts_at).toLocaleString('pt-BR')}{period.ends_at ? ` · fim ${new Date(period.ends_at).toLocaleString('pt-BR')}` : ''}</Text>)}
+  </> : null}
+  {error ? <Button variant="secondary" disabled={loading || busy} onPress={() => target ? void open(target) : void load()}>Tentar novamente</Button> : null}
+ </>;
+}
+const styles = StyleSheet.create({ heading: { fontFamily: 'Lato_900Black', fontSize: 28, lineHeight: 34 }, body: { fontFamily: 'Lato_400Regular', fontSize: 16, lineHeight: 24 }, label: { fontFamily: 'Lato_700Bold', fontSize: 15, lineHeight: 22 }, field: { gap: 8 }, input: { minHeight: 48, borderRadius: 12, borderWidth: 1, padding: 12, fontFamily: 'Lato_400Regular', fontSize: 16 } });

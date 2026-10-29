@@ -22,6 +22,7 @@ alter default privileges in schema public grant truncate, references, trigger, m
 \ir ../reconciliation/20261029050746_physical_assessments.sql
 \ir ../reconciliation/20261029051542_private_training_chat.sql
 \ir ../reconciliation/20261029052037_access_period_precedence.sql
+\ir ../reconciliation/20261029052507_record_student_access.sql
 do $$ declare t text; role_name text; begin foreach t in array array['profiles','organizations','organization_members','trainer_students','access_periods','onboarding_progress','form_templates','form_questions','anamnesis_submissions','anamnesis_answers','audit_logs','exercises'] loop foreach role_name in array array['anon','authenticated'] loop if has_table_privilege(role_name, 'public.' || t, 'truncate') or has_table_privilege(role_name, 'public.' || t, 'references') or has_table_privilege(role_name, 'public.' || t, 'trigger') or has_table_privilege(role_name, 'public.' || t, 'maintain') then raise exception 'unsafe table grants on % for %', t, role_name; end if; end loop; end loop; end $$;
 create table public.synthetic_default_privilege_probe (id integer);
 do $$ begin if has_table_privilege('anon','public.synthetic_default_privilege_probe','truncate') or has_table_privilege('authenticated','public.synthetic_default_privilege_probe','maintain') then raise exception 'unsafe default privileges'; end if; end $$;
@@ -148,4 +149,16 @@ set local role authenticated;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
 do $$ begin if (select count(*) from public.training_plans) <> 0 then raise exception 'future period granted access early'; end if; end $$;
 
+-- Only staff authorized by RLS may record a new access period.
+do $$ declare denied boolean:=false; begin begin perform public.record_student_access('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','active',null); exception when others then denied:=true; end; if not denied then raise exception 'student changed access'; end if; end $$;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
+select public.record_student_access('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','blocked',null);
+do $$ declare denied boolean:=false; begin begin perform public.record_student_access('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000005','active',null); exception when others then denied:=true; end; if not denied then raise exception 'trainer changed another organization access'; end if; end $$;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.record_student_access('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','active',now()+interval '1 day');
+do $$ declare denied boolean:=false; begin
+ begin perform public.record_student_access('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','active',now()-interval '1 second'); exception when others then denied:=true; end;
+ if not denied then raise exception 'past access end accepted'; end if;
+ if not exists(select 1 from public.audit_logs where action='access_period.created' and actor_id='00000000-0000-0000-0000-000000000001') then raise exception 'access change was not audited'; end if;
+end $$;
 rollback;
