@@ -20,6 +20,8 @@ alter default privileges in schema public grant truncate, references, trigger, m
 \ir ../reconciliation/20261029032358_training_prescriptions.sql
 \ir ../reconciliation/20261029033539_training_sessions.sql
 \ir ../reconciliation/20261029050746_physical_assessments.sql
+\ir ../reconciliation/20261029051542_private_training_chat.sql
+\ir ../reconciliation/20261029052037_access_period_precedence.sql
 do $$ declare t text; role_name text; begin foreach t in array array['profiles','organizations','organization_members','trainer_students','access_periods','onboarding_progress','form_templates','form_questions','anamnesis_submissions','anamnesis_answers','audit_logs','exercises'] loop foreach role_name in array array['anon','authenticated'] loop if has_table_privilege(role_name, 'public.' || t, 'truncate') or has_table_privilege(role_name, 'public.' || t, 'references') or has_table_privilege(role_name, 'public.' || t, 'trigger') or has_table_privilege(role_name, 'public.' || t, 'maintain') then raise exception 'unsafe table grants on % for %', t, role_name; end if; end loop; end loop; end $$;
 create table public.synthetic_default_privilege_probe (id integer);
 do $$ begin if has_table_privilege('anon','public.synthetic_default_privilege_probe','truncate') or has_table_privilege('authenticated','public.synthetic_default_privilege_probe','maintain') then raise exception 'unsafe default privileges'; end if; end $$;
@@ -75,6 +77,8 @@ do $$ declare denied boolean:=false; begin
  begin perform public.create_physical_assessment('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003',70,null,null); exception when others then denied:=true; end;
  if not denied then raise exception 'student could create assessment'; end if;
 end $$;
+do $$ begin if (select count(*) from public.get_training_chat_contacts('10000000-0000-0000-0000-000000000001')) <> 1 then raise exception 'student missing chat contact'; end if; end $$;
+select public.send_training_chat_message('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','Mensagem sintética');
 insert into public.onboarding_progress(organization_id,student_id,tour_step) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003',1);
 insert into public.anamnesis_submissions(id,organization_id,student_id,template_id) values ('50000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','30000000-0000-0000-0000-000000000001');
 do $$ declare denied boolean := false; begin
@@ -95,10 +99,18 @@ set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
 insert into public.exercises(organization_id,name,created_by) values ('10000000-0000-0000-0000-000000000001','Outro exercício sintético','00000000-0000-0000-0000-000000000002');
 do $$ declare denied boolean:=false; begin begin insert into public.exercises(organization_id,name,created_by) values ('20000000-0000-0000-0000-000000000001','Indevido','00000000-0000-0000-0000-000000000002'); exception when others then denied:=true; end; if not denied then raise exception 'cross-organization insert'; end if; end $$;
 do $$ begin if (select count(*) from public.exercises) <> 2 then raise exception 'trainer cannot read catalog'; end if; if (select count(*) from public.training_plans) <> 1 then raise exception 'trainer cannot read linked training'; end if; if (select count(*) from public.training_sessions) <> 0 or (select count(*) from public.physical_assessments) <> 0 then raise exception 'trainer has direct sensitive access'; end if; if (select count(*) from public.get_physical_assessments('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003')) <> 1 then raise exception 'trainer cannot review assessment'; end if; if (select count(*) from public.get_training_session_summary('00000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000001')) <> 1 then raise exception 'trainer cannot review session summary'; end if; if (select count(*) from public.anamnesis_answers) <> 0 then raise exception 'trainer has direct clinical access'; end if; if public.get_anamnesis_submission_for_trainer('50000000-0000-0000-0000-000000000001') is null then raise exception 'linked trainer cannot review'; end if; end $$;
+do $$ begin if (select count(*) from public.get_training_chat_messages('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003')) <> 1 then raise exception 'linked trainer cannot read chat'; end if; end $$;
+select public.send_training_chat_message('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','Resposta sintética');
+reset role;
+do $$ declare denied boolean:=false; begin begin update public.training_chat_messages set body='alterada' where organization_id='10000000-0000-0000-0000-000000000001'; exception when others then denied:=true; end; if not denied then raise exception 'chat message mutable'; end if; if exists(select 1 from public.audit_logs where action like 'training_chat.%' and metadata <> '{}'::jsonb) then raise exception 'chat content leaked to audit metadata'; end if; end $$;
+set local role authenticated;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+do $$ declare denied boolean:=false; begin begin perform public.get_training_chat_messages('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003'); exception when others then denied:=true; end; if not denied then raise exception 'non-participant owner can read chat'; end if; end $$;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
 select public.create_physical_assessment('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003',71,null,null);
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004';
 do $$ begin if (select count(*) from public.form_templates) <> 0 or (select count(*) from public.exercises) <> 1 or (select count(*) from public.training_plans) <> 0 then raise exception 'cross-organization access'; end if; end $$;
-do $$ declare denied boolean:=false; begin begin perform public.get_training_session_summary('00000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000001'); exception when others then denied:=true; end; if not denied then raise exception 'cross-organization session summary'; end if; denied:=false; begin perform public.get_physical_assessments('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003'); exception when others then denied:=true; end; if not denied then raise exception 'cross-organization assessment'; end if; end $$;
+do $$ declare denied boolean:=false; begin begin perform public.get_training_session_summary('00000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000001'); exception when others then denied:=true; end; if not denied then raise exception 'cross-organization session summary'; end if; denied:=false; begin perform public.get_physical_assessments('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003'); exception when others then denied:=true; end; if not denied then raise exception 'cross-organization assessment'; end if; denied:=false; begin perform public.get_training_chat_messages('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003'); exception when others then denied:=true; end; if not denied then raise exception 'cross-organization chat'; end if; end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 do $$ begin if (select count(*) from public.anamnesis_answers) <> 0 then raise exception 'owner has direct clinical access'; end if; if public.get_anamnesis_submission_for_owner('50000000-0000-0000-0000-000000000001') is null then raise exception 'owner cannot review'; end if; end $$;
 update public.exercises set archived_at=now() where id='60000000-0000-0000-0000-000000000001';
@@ -109,7 +121,7 @@ insert into public.access_periods(organization_id,student_id,starts_at,status,re
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
 do $$ begin if (select count(*) from public.anamnesis_answers) <> 0 or (select count(*) from public.onboarding_progress) <> 0 or (select count(*) from public.training_plans) <> 0 or (select count(*) from public.training_sessions) <> 0 or (select count(*) from public.physical_assessments) <> 0 then raise exception 'blocked student retained access'; end if; end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
-do $$ declare denied boolean:=false; begin begin perform public.get_anamnesis_submission_for_trainer('50000000-0000-0000-0000-000000000001'); exception when others then denied:=true; end; if not denied then raise exception 'trainer reviewed blocked student'; end if; denied:=false; begin perform public.get_physical_assessments('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003'); exception when others then denied:=true; end; if not denied then raise exception 'trainer reviewed blocked assessment'; end if; end $$;
+do $$ declare denied boolean:=false; begin begin perform public.get_anamnesis_submission_for_trainer('50000000-0000-0000-0000-000000000001'); exception when others then denied:=true; end; if not denied then raise exception 'trainer reviewed blocked student'; end if; denied:=false; begin perform public.get_physical_assessments('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003'); exception when others then denied:=true; end; if not denied then raise exception 'trainer reviewed blocked assessment'; end if; denied:=false; begin perform public.get_training_chat_messages('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003'); exception when others then denied:=true; end; if not denied then raise exception 'trainer reviewed blocked chat'; end if; end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 update public.access_periods set status='active' where status='blocked' and student_id='00000000-0000-0000-0000-000000000003';
 reset role;
@@ -119,4 +131,21 @@ set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
 do $$ begin if (select count(*) from public.anamnesis_answers) <> 0 or (select count(*) from public.onboarding_progress) <> 0 then raise exception 'archived member retained access'; end if; end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 do $$ begin if (select count(*) from public.training_plans) <> 1 then raise exception 'owner lost training history'; end if; if (select count(*) from public.get_training_session_summary('00000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000001')) <> 1 then raise exception 'owner lost session history'; end if; end $$;
+-- An expired latest period cannot reveal an older, still-open active period.
+reset role;
+update public.organization_members set archived_at=null where profile_id='00000000-0000-0000-0000-000000000003';
+insert into public.access_periods(organization_id,student_id,starts_at,ends_at,status,responsible_id,created_by,updated_by,updated_at,created_at) values
+ ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003',now()-interval '5 days',null,'active','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001',now()+interval '1 second',now()+interval '1 second'),
+ ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003',now()-interval '2 days',now()-interval '1 day','active','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001',now()+interval '2 seconds',now()+interval '2 seconds');
+set local role authenticated;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
+do $$ begin if (select count(*) from public.training_plans) <> 0 or (select count(*) from public.physical_assessments) <> 0 then raise exception 'expired access revived an older period'; end if; end $$;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
+do $$ declare denied boolean:=false; begin begin perform public.get_training_chat_messages('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003'); exception when others then denied:=true; end; if not denied then raise exception 'trainer read expired student chat'; end if; end $$;
+reset role;
+insert into public.access_periods(organization_id,student_id,starts_at,status,responsible_id,created_by,updated_by,updated_at,created_at) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003',now()+interval '1 day','active','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001',now()+interval '3 seconds',now()+interval '3 seconds');
+set local role authenticated;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
+do $$ begin if (select count(*) from public.training_plans) <> 0 then raise exception 'future period granted access early'; end if; end $$;
+
 rollback;
