@@ -73,3 +73,7 @@ Owner e trainer autorizado podem registrar medidas de peso, altura e cintura. Ca
 ## Mensagens
 
 Alunos com acesso ativo e trainers vinculados podem trocar mensagens de texto. Somente os participantes atuais têm acesso; bloquear o aluno, arquivar o vínculo ou remover um papel encerra o acesso. As consultas e os envios são auditados sem incluir o texto no log. A tela exibe as últimas 100 mensagens e tem atualização manual; não há notificações ou anexos nesta etapa.
+
+## Controle de acesso
+
+Owner e trainer vinculado podem registrar um novo período ativo, pendente ou bloqueado para um aluno autorizado. A liberação pode ter um último dia opcional, interpretado no fuso local de quem a registra. O horário de início é definido pelo banco e cada alteração é auditada; o histórico anterior é preservado. A tela ainda não cadastra contas nem cria vínculos entre trainer e aluno.
