@@ -18,6 +18,10 @@ pnpm start
 
 Preencha somente `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY` no `.env`. Nunca crie, copie ou exponha uma `service_role` no app.
 
+## Recuperação de senha
+
+Na entrada, informe o e-mail e selecione “Esqueci minha senha”. O Supabase envia o link de recuperação conforme sua configuração de autenticação. Configure nas URLs de redirecionamento permitidas do Supabase o endereço web de `/reset-password` e o deep link `paduatraining://reset-password` antes de disponibilizar o fluxo; provedores de e-mail e limites do plano também precisam estar configurados. Não use contas reais nos testes.
+
 ## Validação
 
 ```bash
