@@ -28,6 +28,7 @@ Na entrada, informe o e-mail e selecione “Esqueci minha senha”. O Supabase e
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:browser # requer Chromium ou Chrome; CHROMIUM_PATH é opcional
 pnpm exec expo export --platform web
 ```
 
@@ -38,9 +39,10 @@ O aplicativo usa o esquema do projeto Supabase de teste existente, cujo históri
 Os arquivos originais em `supabase/migrations` foram preservados como histórico de uma fundação alternativa. **Não execute `supabase db push` com essa pasta contra o projeto de teste**: ela não corresponde ao histórico remoto e tentaria recriar objetos existentes. Para alterações futuras, compare o histórico remoto e crie migrations aditivas específicas para esse esquema; não reescreva migrations já aplicadas.
 
 RLS protege todas as tabelas públicas e os papéis vêm de `organization_members`. Owner e trainer consultam respostas clínicas por funções auditadas, sem acesso direto às respostas. Antes de aplicar alterações em outra instância, compare seu esquema e histórico e execute os testes transacionais.
+
 ## CI e previews
 
-O GitHub Actions executa lint, tipagem, testes e export web em pull requests e pushes. O Vercel usa `vercel.json` para publicar o conteúdo estático de `dist`; conecte o repositório no painel do Vercel para ativar previews. Os perfis `development`, `preview` e `production` estão declarados em `eas.json`, mas o uso de EAS exige uma conta e projeto Expo configurados fora deste repositório.
+O GitHub Actions executa lint, tipagem, testes unitários, navegação com API sintética, testes transacionais de RLS e export web em pull requests e pushes. O Vercel usa `vercel.json` para publicar o conteúdo estático de `dist`; conecte o repositório no painel do Vercel para ativar previews. Os perfis `development`, `preview` e `production` estão declarados em `eas.json`, mas o uso de EAS exige uma conta e projeto Expo configurados fora deste repositório.
 
 ## Onboarding e anamnese
 

@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "export:web": "expo export --platform web"
+    "export:web": "expo export --platform web",
+    "test:browser": "node scripts/browser-smoke.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/lato": "^0.2.3",
@@ -30,14 +31,15 @@
     "react-native": "0.81.4",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
-    "react-native-web": "~0.21.0",
     "react-native-url-polyfill": "^2.0.0",
+    "react-native-web": "~0.21.0",
     "zod": "^4.1.5"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
     "eslint": "^9.35.0",
     "eslint-config-expo": "~10.0.0",
+    "playwright-core": "1.55.0",
     "typescript": "~5.9.2",
     "vitest": "^3.2.4"
   }
