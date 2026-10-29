@@ -3,7 +3,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Alert, StyleSheet, Text, TextInput, useColorScheme, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { Button, Screen, Surface } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { palette, space } from '@/lib/theme';
@@ -19,7 +19,7 @@ export default function SignIn() {
     if (!supabase) return Alert.alert('Configuração pendente', 'Adicione as chaves públicas do Supabase ao arquivo .env.');
     setLoading(true); const { error } = await supabase.auth.signInWithPassword(values); setLoading(false);
     if (error) return Alert.alert('Não foi possível entrar', 'Confira seus dados ou tente novamente.');
-    router.replace('/pending');
+    router.replace('/workspace' as Href);
   };
   return <Screen><Surface><View style={{ gap: space.xs }}><Text style={[styles.title, { color: colors.textPrimary }]}>Bem-vindo de volta</Text><Text style={[styles.body, { color: colors.textSecondary }]}>Entre para acessar seu espaço no Padua Training.</Text></View>
     <Controller control={control} name="email" render={({ field: { onChange, value } }) => <Field label="E-mail" value={value} onChangeText={onChange} error={errors.email?.message} keyboardType="email-address" />} />

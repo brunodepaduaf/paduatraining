@@ -1,6 +1,6 @@
 # Padua Training
 
-Aplicação Expo/React Native para gestão segura de alunos de personal trainers. A primeira sprint entrega a fundação: tema, navegação, autenticação e modelo Supabase protegido por RLS.
+Aplicação Expo/React Native para gestão segura de alunos de personal trainers. A aplicação inclui onboarding retomável e anamnese dinâmica, além da fundação de autenticação e acesso protegido por RLS.
 
 ## Pré-requisitos
 
@@ -37,8 +37,16 @@ Antes de aplicar em uma instância compartilhada, execute os testes transacionai
 
 O GitHub Actions executa lint, tipagem, testes e export web em pull requests e pushes. O Vercel usa `vercel.json` para publicar o conteúdo estático de `dist`; conecte o repositório no painel do Vercel para ativar previews. Os perfis `development`, `preview` e `production` estão declarados em `eas.json`, mas o uso de EAS exige uma conta e projeto Expo configurados fora deste repositório.
 
-## Sprint 2 em andamento
+## Onboarding e anamnese
 
-A validação de respostas dinâmicas em `lib/anamnesis/validation.ts` cobre os tipos previstos e campos obrigatórios, mas ainda não está conectada a telas ou à persistência. Ela não substitui validação e autorização no banco. O tour, a administração e o preenchimento da anamnese ainda não estão disponíveis.
+Após entrar, selecione a organização quando houver mais de uma. O aluno com acesso ativo pode retomar o tour, escolher uma anamnese publicada, salvar respostas incompletas como rascunho e enviar quando preencher os campos obrigatórios. O envio é definitivo. Um formulário arquivado deixa de aparecer para novos preenchimentos; publique uma nova versão para alterações.
 
-A migration de fundação ainda precisa de reforços antes de receber dados clínicos: a imutabilidade de perguntas publicadas e de respostas enviadas deve ser aplicada no banco, e as políticas de acesso e isolamento devem ser ampliadas e testadas transacionalmente. Use somente dados sintéticos até que esses controles sejam implementados e verificados.
+O owner cria formulários em rascunho, define perguntas e opções, publica, arquiva e duplica versões. Apenas rascunhos podem ser excluídos. Formulários publicados e respostas enviadas são protegidos no banco; a interface não substitui RLS. As informações de acesso e os papéis vêm de `access_periods` e `organization_members`. Não use dados reais nos testes.
+
+Para executar o teste transacional de isolamento, use uma base PostgreSQL **vazia e descartável**, com permissão para criar roles e extensões, e execute a partir da raiz do repositório:
+
+```bash
+psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/rls-isolation.sql
+```
+
+O teste cria um esquema mínimo de autenticação, aplica as migrations, usa apenas dados sintéticos e termina com `ROLLBACK`. Ele verifica owner, trainer vinculado, aluno ativo e bloqueado, organizações distintas e imutabilidade. Execute também em uma instância Supabase local ou staging antes de implantar migrations em ambiente compartilhado.

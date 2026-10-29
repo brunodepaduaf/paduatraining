@@ -2,17 +2,17 @@ import { PropsWithChildren } from 'react';
 import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { palette, radius, space } from '@/lib/theme';
 
-type ButtonProps = PropsWithChildren<{ onPress?: () => void; variant?: 'primary' | 'secondary'; disabled?: boolean }>;
+type ButtonProps = PropsWithChildren<{ onPress?: () => void; variant?: 'primary' | 'secondary'; disabled?: boolean; selected?: boolean }>;
 
 export function Screen({ children }: PropsWithChildren) {
   const colors = palette[useColorScheme() === 'dark' ? 'dark' : 'light'];
   return <View style={[styles.screen, { backgroundColor: colors.background }]}>{children}</View>;
 }
 
-export function Button({ children, onPress, variant = 'primary', disabled }: ButtonProps) {
+export function Button({ children, onPress, variant = 'primary', disabled, selected }: ButtonProps) {
   const colors = palette[useColorScheme() === 'dark' ? 'dark' : 'light'];
   const secondary = variant === 'secondary';
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.button, { backgroundColor: secondary ? colors.surfaceElevated : colors.brand, borderColor: colors.border, opacity: disabled ? .5 : pressed ? .85 : 1 }, secondary && styles.secondary]}>
+  return <Pressable accessibilityRole="button" accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.button, { backgroundColor: secondary ? colors.surfaceElevated : colors.brand, borderColor: colors.border, opacity: disabled ? .5 : pressed ? .85 : 1 }, secondary && styles.secondary]}>
     <Text style={[styles.buttonText, { color: secondary ? colors.textPrimary : '#FFF8FB' }]}>{children}</Text>
   </Pressable>;
 }
