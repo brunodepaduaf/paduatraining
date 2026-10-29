@@ -36,3 +36,9 @@ Antes de aplicar em uma instância compartilhada, execute os testes transacionai
 ## CI e previews
 
 O GitHub Actions executa lint, tipagem, testes e export web em pull requests e pushes. O Vercel usa `vercel.json` para publicar o conteúdo estático de `dist`; conecte o repositório no painel do Vercel para ativar previews. Os perfis `development`, `preview` e `production` estão declarados em `eas.json`, mas o uso de EAS exige uma conta e projeto Expo configurados fora deste repositório.
+
+## Sprint 2 em andamento
+
+A validação de respostas dinâmicas em `lib/anamnesis/validation.ts` cobre os tipos previstos e campos obrigatórios, mas ainda não está conectada a telas ou à persistência. Ela não substitui validação e autorização no banco. O tour, a administração e o preenchimento da anamnese ainda não estão disponíveis.
+
+A migration de fundação ainda precisa de reforços antes de receber dados clínicos: a imutabilidade de perguntas publicadas e de respostas enviadas deve ser aplicada no banco, e as políticas de acesso e isolamento devem ser ampliadas e testadas transacionalmente. Use somente dados sintéticos até que esses controles sejam implementados e verificados.
