@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TextI
 import { router } from 'expo-router';
 import { Button, Surface } from '@/components/ui';
 import { StaffReview } from '@/components/anamnesis/staff-review';
+import { ExerciseCatalog } from '@/components/exercises/catalog';
 import { supabase } from '@/lib/supabase';
 import { palette } from '@/lib/theme';
 import { prepareAnswers, validateAnswers, type QuestionKind } from '@/lib/anamnesis/validation';
@@ -18,6 +19,7 @@ export default function Workspace() {
  const colors = palette[useColorScheme() === 'dark' ? 'dark' : 'light'];
  const [members, setMembers] = useState<Member[]>([]); const [member, setMember] = useState<Member | null>(null);
  const [unsavedAnswers, setUnsavedAnswers] = useState(false);
+ const [staffArea, setStaffArea] = useState<'anamnesis' | 'exercises'>('anamnesis');
  const [user, setUser] = useState(''); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
  const load = useCallback(async () => {
   setLoading(true); setError('');
@@ -35,7 +37,7 @@ export default function Workspace() {
  return <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled"><Surface>
   {loading ? <ActivityIndicator accessibilityLabel="Carregando acesso" /> : error ? <><Heading>Não foi possível continuar</Heading><Body>{error}</Body><Button onPress={load}>Tentar novamente</Button></> : !member ? <><Heading>Seu espaço</Heading>{members.length ? <><Body>Escolha uma organização para continuar.</Body>{members.map(m => <Button key={m.organization_id} variant="secondary" onPress={() => setMember(m)}>{m.organizations?.name ?? 'Organização'} · {m.role}</Button>)}</> : <Body>Seu acesso está pendente. Entre em contato com sua equipe.</Body>}</> : <>
    {members.length > 1 && <Button variant="secondary" onPress={() => confirmDiscard(unsavedAnswers, () => { setUnsavedAnswers(false); setMember(null); })}>Trocar organização</Button>}
-   {member.role === 'owner' ? <Owner org={member.organization_id} user={user} /> : member.role === 'student' ? <Student org={member.organization_id} user={user} dirty={unsavedAnswers} onDirtyChange={setUnsavedAnswers} /> : <StaffReview org={member.organization_id} role="trainer" />}
+   {member.role === 'student' ? <Student org={member.organization_id} user={user} dirty={unsavedAnswers} onDirtyChange={setUnsavedAnswers} /> : <><Button variant="secondary" onPress={() => setStaffArea(staffArea === 'anamnesis' ? 'exercises' : 'anamnesis')}>{staffArea === 'anamnesis' ? 'Ir para exercícios' : 'Ir para anamneses'}</Button>{staffArea === 'exercises' ? <ExerciseCatalog org={member.organization_id} user={user} /> : member.role === 'owner' ? <Owner org={member.organization_id} user={user} /> : <StaffReview org={member.organization_id} role="trainer" />}</>}
   </>}
   <Button variant="secondary" onPress={() => confirmDiscard(unsavedAnswers, () => { void (async () => { await supabase?.auth.signOut(); setUnsavedAnswers(false); router.replace('/'); })(); })}>Sair da conta</Button>
  </Surface></ScrollView>;
