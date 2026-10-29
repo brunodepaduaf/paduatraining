@@ -29,7 +29,7 @@ pnpm exec expo export --platform web
 
 ## Banco de dados
 
-O aplicativo usa o esquema do projeto Supabase de teste existente, cujo histórico é diferente da fundação originalmente criada neste repositório. `supabase/reconciliation/remote-history.sql` é uma cópia do SQL das 11 migrations já registradas nesse projeto, para reprodução local; a migration complementar `20261029023003_reconcile_existing_anamnesis.sql` foi aplicada ao projeto de teste com essa versão.
+O aplicativo usa o esquema do projeto Supabase de teste existente, cujo histórico é diferente da fundação originalmente criada neste repositório. `supabase/reconciliation/remote-history.sql` é uma cópia do SQL das 11 migrations já registradas nesse projeto, para reprodução local; as migrations complementares `20261029023003_reconcile_existing_anamnesis.sql`, `20261029030224_exercise_catalog.sql`, `20261029031147_restrict_client_table_privileges.sql` e `20261029031355_restrict_table_default_privileges.sql` foram aplicadas ao projeto de teste com essas versões.
 
 Os arquivos originais em `supabase/migrations` foram preservados como histórico de uma fundação alternativa. **Não execute `supabase db push` com essa pasta contra o projeto de teste**: ela não corresponde ao histórico remoto e tentaria recriar objetos existentes. Para alterações futuras, compare o histórico remoto e crie migrations aditivas específicas para esse esquema; não reescreva migrations já aplicadas.
 
@@ -53,3 +53,7 @@ psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/reconciliation.sq
 ```
 
 O teste cria esquemas mínimos de autenticação e storage, reproduz o histórico remoto e aplica a migration complementar, usa apenas dados sintéticos e termina com `ROLLBACK`. O teste `rls-isolation.sql` cobre a fundação alternativa e não descreve o projeto de teste atual. Ele verifica owner, trainer vinculado, aluno ativo e bloqueado, organizações distintas e imutabilidade. Execute também em uma instância Supabase local ou staging antes de implantar migrations em ambiente compartilhado.
+
+## Catálogo de exercícios
+
+Owner e trainer podem cadastrar, editar e arquivar exercícios da própria organização. Exercícios arquivados permanecem disponíveis para preservar referências futuras; não há exclusão pela aplicação. O catálogo é uma etapa anterior à prescrição: alunos ainda não recebem acesso direto a ele e não há treinos prescritos nesta entrega.

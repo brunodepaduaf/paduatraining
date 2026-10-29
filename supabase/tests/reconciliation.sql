@@ -11,6 +11,16 @@ create schema storage;
 create table storage.buckets (id text primary key, name text, public boolean);
 \ir ../reconciliation/remote-history.sql
 \ir ../reconciliation/20261029023003_reconcile_existing_anamnesis.sql
+\ir ../reconciliation/20261029030224_exercise_catalog.sql
+-- Reproduce the Supabase defaults observed on the existing test project.
+grant truncate, references, trigger, maintain on all tables in schema public to anon, authenticated;
+alter default privileges in schema public grant truncate, references, trigger, maintain on tables to anon, authenticated;
+\ir ../reconciliation/20261029031147_restrict_client_table_privileges.sql
+\ir ../reconciliation/20261029031355_restrict_table_default_privileges.sql
+do $$ declare t text; role_name text; begin foreach t in array array['profiles','organizations','organization_members','trainer_students','access_periods','onboarding_progress','form_templates','form_questions','anamnesis_submissions','anamnesis_answers','audit_logs','exercises'] loop foreach role_name in array array['anon','authenticated'] loop if has_table_privilege(role_name, 'public.' || t, 'truncate') or has_table_privilege(role_name, 'public.' || t, 'references') or has_table_privilege(role_name, 'public.' || t, 'trigger') or has_table_privilege(role_name, 'public.' || t, 'maintain') then raise exception 'unsafe table grants on % for %', t, role_name; end if; end loop; end loop; end $$;
+create table public.synthetic_default_privilege_probe (id integer);
+do $$ begin if has_table_privilege('anon','public.synthetic_default_privilege_probe','truncate') or has_table_privilege('authenticated','public.synthetic_default_privilege_probe','maintain') then raise exception 'unsafe default privileges'; end if; end $$;
+do $$ begin if has_table_privilege('anon', 'public.exercises', 'select') or has_table_privilege('authenticated', 'public.exercises', 'truncate') or has_table_privilege('authenticated', 'public.exercises', 'delete') then raise exception 'exercise grants are too broad'; end if; end $$;
 insert into auth.users(id) values ('00000000-0000-0000-0000-000000000001'), ('00000000-0000-0000-0000-000000000002'), ('00000000-0000-0000-0000-000000000003'), ('00000000-0000-0000-0000-000000000004'), ('00000000-0000-0000-0000-000000000005');
 insert into public.organizations(id, name, created_by) values ('10000000-0000-0000-0000-000000000001','Org sintética A','00000000-0000-0000-0000-000000000001'), ('20000000-0000-0000-0000-000000000001','Org sintética B','00000000-0000-0000-0000-000000000004');
 insert into public.organization_members(organization_id,profile_id,role) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','owner'), ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','trainer'), ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','student'), ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000004','owner'), ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000005','student');
@@ -18,6 +28,8 @@ insert into public.trainer_students(organization_id,trainer_id,student_id,create
 insert into public.access_periods(organization_id,student_id,starts_at,status,responsible_id,created_by,updated_by) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003',now()-interval '1 day','active','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001');
 set local role authenticated;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+-- Exercise data are synthetic and scoped to the organization.
+insert into public.exercises(id,organization_id,name,instructions,created_by) values ('60000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Exercício sintético','Instruções sintéticas','00000000-0000-0000-0000-000000000001');
 insert into public.form_templates(id,organization_id,title,version,created_by,description) values ('30000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Anamnese sintética',1,'00000000-0000-0000-0000-000000000001','Descrição sintética');
 insert into public.form_questions(id,template_id,position,prompt,question_type,required) values ('40000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001',1,'Pergunta sintética','text',true);
 update public.form_templates set status = 'published' where id='30000000-0000-0000-0000-000000000001';
@@ -26,7 +38,7 @@ do $$ declare denied boolean := false; begin
  if not denied then raise exception 'published question mutable'; end if;
 end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
-do $$ begin if (select count(*) from public.form_templates) <> 1 then raise exception 'student cannot read published template'; end if; end $$;
+do $$ begin if (select count(*) from public.form_templates) <> 1 then raise exception 'student cannot read published template'; end if; if (select count(*) from public.exercises) <> 0 then raise exception 'student can read staff catalog'; end if; end $$;
 insert into public.onboarding_progress(organization_id,student_id,tour_step) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003',1);
 insert into public.anamnesis_submissions(id,organization_id,student_id,template_id) values ('50000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','30000000-0000-0000-0000-000000000001');
 do $$ declare denied boolean := false; begin
@@ -44,11 +56,15 @@ do $$ declare denied boolean := false; begin
  if not denied then raise exception 'submitted submission mutable'; end if;
 end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
-do $$ begin if (select count(*) from public.anamnesis_answers) <> 0 then raise exception 'trainer has direct clinical access'; end if; if public.get_anamnesis_submission_for_trainer('50000000-0000-0000-0000-000000000001') is null then raise exception 'linked trainer cannot review'; end if; end $$;
+insert into public.exercises(organization_id,name,created_by) values ('10000000-0000-0000-0000-000000000001','Outro exercício sintético','00000000-0000-0000-0000-000000000002');
+do $$ declare denied boolean:=false; begin begin insert into public.exercises(organization_id,name,created_by) values ('20000000-0000-0000-0000-000000000001','Indevido','00000000-0000-0000-0000-000000000002'); exception when others then denied:=true; end; if not denied then raise exception 'cross-organization insert'; end if; end $$;
+do $$ begin if (select count(*) from public.exercises) <> 2 then raise exception 'trainer cannot read catalog'; end if; if (select count(*) from public.anamnesis_answers) <> 0 then raise exception 'trainer has direct clinical access'; end if; if public.get_anamnesis_submission_for_trainer('50000000-0000-0000-0000-000000000001') is null then raise exception 'linked trainer cannot review'; end if; end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004';
-do $$ begin if (select count(*) from public.form_templates) <> 0 then raise exception 'cross-organization access'; end if; end $$;
+do $$ begin if (select count(*) from public.form_templates) <> 0 or (select count(*) from public.exercises) <> 0 then raise exception 'cross-organization access'; end if; end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 do $$ begin if (select count(*) from public.anamnesis_answers) <> 0 then raise exception 'owner has direct clinical access'; end if; if public.get_anamnesis_submission_for_owner('50000000-0000-0000-0000-000000000001') is null then raise exception 'owner cannot review'; end if; end $$;
+update public.exercises set archived_at=now() where id='60000000-0000-0000-0000-000000000001';
+do $$ declare denied boolean:=false; begin begin update public.exercises set name='Alterado' where id='60000000-0000-0000-0000-000000000001'; exception when others then denied:=true; end; if not denied then raise exception 'archived exercise mutable'; end if; end $$;
 update public.form_templates set status='archived' where id='30000000-0000-0000-0000-000000000001';
 do $$ declare denied boolean:=false; begin begin update public.form_questions set prompt='alterada' where id='40000000-0000-0000-0000-000000000001'; exception when others then denied:=true; end; if not denied then raise exception 'archived question mutable'; end if; end $$;
 insert into public.access_periods(organization_id,student_id,starts_at,status,responsible_id,created_by,updated_by) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003',now()-interval '1 hour','blocked','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001');
