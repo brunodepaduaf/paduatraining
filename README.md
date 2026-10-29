@@ -79,3 +79,7 @@ Alunos com acesso ativo e trainers vinculados podem trocar mensagens de texto. S
 ## Controle de acesso
 
 Owner e trainer vinculado podem registrar um novo período ativo, pendente ou bloqueado para um aluno autorizado. A liberação pode ter um último dia opcional, interpretado no fuso local de quem a registra. O horário de início é definido pelo banco e cada alteração é auditada; o histórico anterior é preservado. A tela ainda não cadastra contas nem cria vínculos entre trainer e aluno.
+
+## Vínculos de treino
+
+O owner pode vincular ou encerrar o vínculo entre membros existentes. Trainers não podem atribuir alunos a si mesmos; ao remover o vínculo ou arquivar o papel, o acesso associado deixa de existir. O cadastro de novas contas ainda não está disponível.
