@@ -164,23 +164,23 @@ do $$ declare denied boolean:=false; begin
 end $$;
 -- A trainer cannot self-assign an unlinked student; only the owner can assign.
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
-do $ declare denied boolean:=false; begin begin insert into public.trainer_students(organization_id,trainer_id,student_id,created_by) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000002'); exception when others then denied:=true; end; if not denied then raise exception 'trainer self-assigned student'; end if; end $;
+do $$ declare denied boolean:=false; begin begin insert into public.trainer_students(organization_id,trainer_id,student_id,created_by) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000002'); exception when others then denied:=true; end; if not denied then raise exception 'trainer self-assigned student'; end if; end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 insert into public.trainer_students(organization_id,trainer_id,student_id,created_by) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000001');
-do $ declare denied boolean:=false; begin begin update public.trainer_students set created_by='00000000-0000-0000-0000-000000000002' where student_id='00000000-0000-0000-0000-000000000006'; exception when others then denied:=true; end; if not denied then raise exception 'trainer link identity changed'; end if; end $;
+do $$ declare denied boolean:=false; begin begin update public.trainer_students set created_by='00000000-0000-0000-0000-000000000002' where student_id='00000000-0000-0000-0000-000000000006'; exception when others then denied:=true; end; if not denied then raise exception 'trainer link identity changed'; end if; end $$;
 update public.trainer_students set archived_at=now() where trainer_id='00000000-0000-0000-0000-000000000002' and student_id='00000000-0000-0000-0000-000000000003';
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
-do $ begin if (select count(*) from public.training_plans where student_id='00000000-0000-0000-0000-000000000003') <> 0 or (select count(*) from public.profiles where id='00000000-0000-0000-0000-000000000003') <> 0 or (select count(*) from public.access_periods where student_id='00000000-0000-0000-0000-000000000003') <> 0 then raise exception 'unlinked trainer retained student access'; end if; end $;
+do $$ begin if (select count(*) from public.training_plans where student_id='00000000-0000-0000-0000-000000000003') <> 0 or (select count(*) from public.profiles where id='00000000-0000-0000-0000-000000000003') <> 0 or (select count(*) from public.access_periods where student_id='00000000-0000-0000-0000-000000000003') <> 0 then raise exception 'unlinked trainer retained student access'; end if; end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 update public.trainer_students set archived_at=null where trainer_id='00000000-0000-0000-0000-000000000002' and student_id='00000000-0000-0000-0000-000000000003';
 reset role;
 update public.organization_members set archived_at=now() where profile_id='00000000-0000-0000-0000-000000000002';
 set local role authenticated;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
-do $ begin
+do $$ begin
  if (select count(*) from public.profiles where id='00000000-0000-0000-0000-000000000003') <> 0 then raise exception 'archived trainer read profile'; end if;
  if (select count(*) from public.organization_members where profile_id='00000000-0000-0000-0000-000000000003') <> 0 then raise exception 'archived trainer read membership'; end if;
  if (select count(*) from public.access_periods where student_id='00000000-0000-0000-0000-000000000003') <> 0 then raise exception 'archived trainer read access periods'; end if;
  if (select count(*) from public.trainer_students where trainer_id='00000000-0000-0000-0000-000000000002') <> 0 then raise exception 'archived trainer read links'; end if;
-end $;
+end $$;
 rollback;
