@@ -42,6 +42,8 @@ O GitHub Actions executa lint, tipagem, testes e export web em pull requests e p
 
 Após entrar, selecione a organização quando houver mais de uma. O aluno com acesso ativo pode retomar o tour, escolher uma anamnese publicada, salvar respostas incompletas como rascunho e enviar quando preencher os campos obrigatórios. Campos numéricos aceitam ponto ou vírgula decimal. Ao voltar à lista, trocar de organização ou sair da conta com alterações não salvas, o aluno recebe uma confirmação. O envio é definitivo. Um formulário arquivado deixa de aparecer para novos preenchimentos; publique uma nova versão para alterações.
 
+Owner e trainer vinculado podem consultar anamneses enviadas; a leitura dos detalhes é auditada pelo banco.
+
 O owner cria formulários em rascunho, define perguntas e opções, publica, arquiva e duplica versões. Apenas rascunhos podem ser excluídos. Formulários publicados e respostas enviadas são protegidos no banco; a interface não substitui RLS. As informações de acesso e os papéis vêm de `access_periods` e `organization_members`. Não use dados reais nos testes.
 
 Para executar o teste transacional de isolamento, use uma base PostgreSQL **vazia e descartável**, com permissão para criar roles e extensões, e execute a partir da raiz do repositório:
