@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-28T00:00:00Z",
+  "title": "Design System: Padua Training",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Vinho de impulso", "canonical": "#9E365F", "tonalRamp": ["#35101F", "#562039", "#76294B", "#9E365F", "#B84D78", "#D36B94", "#EDABC1", "#FBE4EC"] },
+      "light-surface": { "role": "neutral", "displayName": "Superfície de recuperação", "canonical": "#FFFBFD", "tonalRamp": ["#322B2F", "#51464D", "#6C5E66", "#96858D", "#BFAFB6", "#D8CCD2", "#F0E9ED", "#FFFBFD"] }
+    },
+    "typographyMeta": { "display": { "displayName": "Lato Black", "purpose": "Títulos de chegada e orientação." }, "body": { "displayName": "Lato Regular", "purpose": "Leitura contínua e instruções." } },
+    "shadows": [],
+    "motion": [{ "name": "state-feedback", "value": "180ms cubic-bezier(0.2, 0, 0, 1)", "purpose": "Resposta curta de pressão e foco; conteúdo permanece visível." }],
+    "breakpoints": [{ "name": "mobile", "value": "0px" }, { "name": "admin-wide", "value": "768px" }]
+  },
+  "components": [
+    { "name": "Primary Button", "kind": "button", "refersTo": "button-primary", "description": "Ação principal do fluxo.", "html": "<button class=\"ds-btn-primary\">ENTRAR</button>", "css": ".ds-btn-primary { min-height:48px; padding:0 16px; border:0; border-radius:12px; background:#9E365F; color:#FFF8FB; font:700 16px Lato,sans-serif; cursor:pointer; transition:opacity 180ms cubic-bezier(.2,0,0,1); } .ds-btn-primary:hover { opacity:.88; } .ds-btn-primary:focus-visible { outline:3px solid #D36B94; outline-offset:3px; } .ds-btn-primary:active { opacity:.76; }" },
+    { "name": "Secondary Button", "kind": "button", "refersTo": "button-secondary", "description": "Ação auxiliar ou retorno seguro.", "html": "<button class=\"ds-btn-secondary\">VOLTAR</button>", "css": ".ds-btn-secondary { min-height:48px; padding:0 16px; border:1px solid #D8CCD2; border-radius:12px; background:#F0E9ED; color:#2D252A; font:700 16px Lato,sans-serif; cursor:pointer; } .ds-btn-secondary:hover { background:#FFFBFD; } .ds-btn-secondary:focus-visible { outline:3px solid #B84D78; outline-offset:3px; }" },
+    { "name": "Text Field", "kind": "input", "refersTo": "input-field", "description": "Campo com label persistente e estado de erro textual.", "html": "<label class=\"ds-field\">E-mail<input type=\"email\" placeholder=\"voce@exemplo.com\"></label>", "css": ".ds-field { display:grid; gap:8px; color:#2D252A; font:700 15px Lato,sans-serif; } .ds-field input { min-height:48px; padding:0 14px; border:1px solid #D8CCD2; border-radius:12px; background:#F0E9ED; color:#2D252A; font:400 16px Lato,sans-serif; } .ds-field input:focus-visible { outline:3px solid #B84D78; outline-offset:2px; border-color:#9E365F; }" }
+  ],
+  "narrative": {
+    "northStar": "Precisão em movimento",
+    "overview": "A experiência usa clareza operacional, contraste controlado e uma paleta vinho com intenção. A hierarquia nasce de superfícies tonais e tipografia firme, adequada ao aluno em movimento e à administração no navegador.",
+    "keyCharacteristics": ["Clareza operacional antes de decoração.", "Acento vinho reservado para ações e decisões importantes.", "Linguagem direta, humana e sem promessas não verificadas."],
+    "rules": [{ "name": "The Accent Discipline Rule", "body": "O vinho aparece para ação, estado selecionado ou informação decisiva; não colore estruturas inteiras da tela.", "section": "colors" }, { "name": "The Tonal Hierarchy Rule", "body": "Uma mudança de contexto usa primeiro tom e espaçamento; elevação física só será introduzida quando uma interação realmente precisar flutuar.", "section": "elevation" }],
+    "dos": ["Do usar Lato Black somente em títulos de destaque e Lato Bold em ações e rótulos.", "Do manter labels persistentes e mensagens de erro que expliquem a recuperação."],
+    "donts": ["Don't usar preto ou branco absolutos como fundo principal.", "Don't usar gradiente em texto, vidro decorativo, ícones emoji ou sombras como estrutura."]
+  }
+}
