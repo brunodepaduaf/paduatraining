@@ -23,13 +23,14 @@ alter default privileges in schema public grant truncate, references, trigger, m
 \ir ../reconciliation/20261029051542_private_training_chat.sql
 \ir ../reconciliation/20261029052037_access_period_precedence.sql
 \ir ../reconciliation/20261029052507_record_student_access.sql
+\ir ../reconciliation/20261029141446_trainer_link_authorization.sql
 do $$ declare t text; role_name text; begin foreach t in array array['profiles','organizations','organization_members','trainer_students','access_periods','onboarding_progress','form_templates','form_questions','anamnesis_submissions','anamnesis_answers','audit_logs','exercises'] loop foreach role_name in array array['anon','authenticated'] loop if has_table_privilege(role_name, 'public.' || t, 'truncate') or has_table_privilege(role_name, 'public.' || t, 'references') or has_table_privilege(role_name, 'public.' || t, 'trigger') or has_table_privilege(role_name, 'public.' || t, 'maintain') then raise exception 'unsafe table grants on % for %', t, role_name; end if; end loop; end loop; end $$;
 create table public.synthetic_default_privilege_probe (id integer);
 do $$ begin if has_table_privilege('anon','public.synthetic_default_privilege_probe','truncate') or has_table_privilege('authenticated','public.synthetic_default_privilege_probe','maintain') then raise exception 'unsafe default privileges'; end if; end $$;
 do $$ begin if has_table_privilege('anon', 'public.exercises', 'select') or has_table_privilege('authenticated', 'public.exercises', 'truncate') or has_table_privilege('authenticated', 'public.exercises', 'delete') then raise exception 'exercise grants are too broad'; end if; end $$;
-insert into auth.users(id) values ('00000000-0000-0000-0000-000000000001'), ('00000000-0000-0000-0000-000000000002'), ('00000000-0000-0000-0000-000000000003'), ('00000000-0000-0000-0000-000000000004'), ('00000000-0000-0000-0000-000000000005');
+insert into auth.users(id) values ('00000000-0000-0000-0000-000000000001'), ('00000000-0000-0000-0000-000000000002'), ('00000000-0000-0000-0000-000000000003'), ('00000000-0000-0000-0000-000000000004'), ('00000000-0000-0000-0000-000000000005'), ('00000000-0000-0000-0000-000000000006');
 insert into public.organizations(id, name, created_by) values ('10000000-0000-0000-0000-000000000001','Org sintética A','00000000-0000-0000-0000-000000000001'), ('20000000-0000-0000-0000-000000000001','Org sintética B','00000000-0000-0000-0000-000000000004');
-insert into public.organization_members(organization_id,profile_id,role) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','owner'), ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','trainer'), ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','student'), ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000004','owner'), ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000005','student');
+insert into public.organization_members(organization_id,profile_id,role) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','owner'), ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','trainer'), ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','student'), ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000004','owner'), ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000005','student'), ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000006','student');
 insert into public.trainer_students(organization_id,trainer_id,student_id,created_by) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001');
 insert into public.access_periods(organization_id,student_id,starts_at,status,responsible_id,created_by,updated_by) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003',now()-interval '1 day','active','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001');
 set local role authenticated;
@@ -160,5 +161,26 @@ do $$ declare denied boolean:=false; begin
  begin perform public.record_student_access('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','active',now()-interval '1 second'); exception when others then denied:=true; end;
  if not denied then raise exception 'past access end accepted'; end if;
  if not exists(select 1 from public.audit_logs where action='access_period.created' and actor_id='00000000-0000-0000-0000-000000000001') then raise exception 'access change was not audited'; end if;
+end $$;
+-- A trainer cannot self-assign an unlinked student; only the owner can assign.
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
+do $$ declare denied boolean:=false; begin begin insert into public.trainer_students(organization_id,trainer_id,student_id,created_by) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000002'); exception when others then denied:=true; end; if not denied then raise exception 'trainer self-assigned student'; end if; end $$;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+insert into public.trainer_students(organization_id,trainer_id,student_id,created_by) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000001');
+do $$ declare denied boolean:=false; begin begin update public.trainer_students set created_by='00000000-0000-0000-0000-000000000002' where student_id='00000000-0000-0000-0000-000000000006'; exception when others then denied:=true; end; if not denied then raise exception 'trainer link identity changed'; end if; end $$;
+update public.trainer_students set archived_at=now() where trainer_id='00000000-0000-0000-0000-000000000002' and student_id='00000000-0000-0000-0000-000000000003';
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
+do $$ begin if (select count(*) from public.training_plans where student_id='00000000-0000-0000-0000-000000000003') <> 0 or (select count(*) from public.profiles where id='00000000-0000-0000-0000-000000000003') <> 0 or (select count(*) from public.access_periods where student_id='00000000-0000-0000-0000-000000000003') <> 0 then raise exception 'unlinked trainer retained student access'; end if; end $$;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+update public.trainer_students set archived_at=null where trainer_id='00000000-0000-0000-0000-000000000002' and student_id='00000000-0000-0000-0000-000000000003';
+reset role;
+update public.organization_members set archived_at=now() where profile_id='00000000-0000-0000-0000-000000000002';
+set local role authenticated;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
+do $$ begin
+ if (select count(*) from public.profiles where id='00000000-0000-0000-0000-000000000003') <> 0 then raise exception 'archived trainer read profile'; end if;
+ if (select count(*) from public.organization_members where profile_id='00000000-0000-0000-0000-000000000003') <> 0 then raise exception 'archived trainer read membership'; end if;
+ if (select count(*) from public.access_periods where student_id='00000000-0000-0000-0000-000000000003') <> 0 then raise exception 'archived trainer read access periods'; end if;
+ if (select count(*) from public.trainer_students where trainer_id='00000000-0000-0000-0000-000000000002') <> 0 then raise exception 'archived trainer read links'; end if;
 end $$;
 rollback;
