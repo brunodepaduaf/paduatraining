@@ -48,7 +48,7 @@ Após entrar, selecione a organização quando houver mais de uma. O aluno com a
 
 Owner e trainer vinculado podem consultar anamneses enviadas; a leitura dos detalhes é auditada pelo banco.
 
-O owner cria formulários em rascunho, define perguntas e opções, publica, arquiva e duplica versões. Apenas rascunhos podem ser excluídos. Formulários publicados e respostas enviadas são protegidos no banco; a interface não substitui RLS. As informações de acesso e os papéis vêm de `access_periods` e `organization_members`. Não use dados reais nos testes.
+O owner cria formulários em rascunho, define perguntas e opções, publica, arquiva e duplica versões. Apenas rascunhos podem ser excluídos. Formulários publicados e respostas enviadas são protegidos no banco; a interface não substitui RLS. As informações de acesso e os papéis vêm de `access_periods` e `organization_members`. O período mais recente já iniciado determina o acesso; seu vencimento não reativa um período antigo. Não use dados reais nos testes.
 
 Para executar o teste transacional de isolamento, use uma base PostgreSQL **vazia e descartável**, com permissão para criar roles e extensões, e execute a partir da raiz do repositório:
 
@@ -69,3 +69,7 @@ Owner e trainer podem criar fichas em rascunho para alunos autorizados, adiciona
 ## Avaliações físicas
 
 Owner e trainer autorizado podem registrar medidas de peso, altura e cintura. Cada registro é imutável, não faz diagnóstico e contém somente as medidas preenchidas; as consultas da equipe são auditadas sem valores no log. O aluno ativo pode consultar as próprias avaliações. Fotografias e outros tipos de avaliação ainda não estão disponíveis.
+
+## Mensagens
+
+Alunos com acesso ativo e trainers vinculados podem trocar mensagens de texto. Somente os participantes atuais têm acesso; bloquear o aluno, arquivar o vínculo ou remover um papel encerra o acesso. As consultas e os envios são auditados sem incluir o texto no log. A tela exibe as últimas 100 mensagens e tem atualização manual; não há notificações ou anexos nesta etapa.
