@@ -29,10 +29,11 @@ pnpm exec expo export --platform web
 
 ## Banco de dados
 
-As migrations vivem em `supabase/migrations`. A migration inicial habilita RLS para todas as tabelas de `public`, usa papéis em `organization_members`, protege respostas clínicas de leitura direta por owner/trainer e registra acesso a anamnese sem gravar o conteúdo no log.
+O aplicativo usa o esquema do projeto Supabase de teste existente, cujo histórico é diferente da fundação originalmente criada neste repositório. `supabase/reconciliation/remote-history.sql` é uma cópia do SQL das 11 migrations já registradas nesse projeto, para reprodução local; a migration complementar `20261029023003_reconcile_existing_anamnesis.sql` foi aplicada ao projeto de teste com essa versão.
 
-Antes de aplicar em uma instância compartilhada, execute os testes transacionais de RLS contra uma instância Supabase local ou de staging. Não há migration destrutiva nesta sprint.
+Os arquivos originais em `supabase/migrations` foram preservados como histórico de uma fundação alternativa. **Não execute `supabase db push` com essa pasta contra o projeto de teste**: ela não corresponde ao histórico remoto e tentaria recriar objetos existentes. Para alterações futuras, compare o histórico remoto e crie migrations aditivas específicas para esse esquema; não reescreva migrations já aplicadas.
 
+RLS protege todas as tabelas públicas e os papéis vêm de `organization_members`. Owner e trainer consultam respostas clínicas por funções auditadas, sem acesso direto às respostas. Antes de aplicar alterações em outra instância, compare seu esquema e histórico e execute os testes transacionais.
 ## CI e previews
 
 O GitHub Actions executa lint, tipagem, testes e export web em pull requests e pushes. O Vercel usa `vercel.json` para publicar o conteúdo estático de `dist`; conecte o repositório no painel do Vercel para ativar previews. Os perfis `development`, `preview` e `production` estão declarados em `eas.json`, mas o uso de EAS exige uma conta e projeto Expo configurados fora deste repositório.
@@ -46,7 +47,7 @@ O owner cria formulários em rascunho, define perguntas e opções, publica, arq
 Para executar o teste transacional de isolamento, use uma base PostgreSQL **vazia e descartável**, com permissão para criar roles e extensões, e execute a partir da raiz do repositório:
 
 ```bash
-psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/rls-isolation.sql
+psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/reconciliation.sql
 ```
 
-O teste cria um esquema mínimo de autenticação, aplica as migrations, usa apenas dados sintéticos e termina com `ROLLBACK`. Ele verifica owner, trainer vinculado, aluno ativo e bloqueado, organizações distintas e imutabilidade. Execute também em uma instância Supabase local ou staging antes de implantar migrations em ambiente compartilhado.
+O teste cria esquemas mínimos de autenticação e storage, reproduz o histórico remoto e aplica a migration complementar, usa apenas dados sintéticos e termina com `ROLLBACK`. O teste `rls-isolation.sql` cobre a fundação alternativa e não descreve o projeto de teste atual. Ele verifica owner, trainer vinculado, aluno ativo e bloqueado, organizações distintas e imutabilidade. Execute também em uma instância Supabase local ou staging antes de implantar migrations em ambiente compartilhado.
