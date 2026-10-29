@@ -17,6 +17,7 @@ grant truncate, references, trigger, maintain on all tables in schema public to 
 alter default privileges in schema public grant truncate, references, trigger, maintain on tables to anon, authenticated;
 \ir ../reconciliation/20261029031147_restrict_client_table_privileges.sql
 \ir ../reconciliation/20261029031355_restrict_table_default_privileges.sql
+\ir ../reconciliation/20261029032358_training_prescriptions.sql
 do $$ declare t text; role_name text; begin foreach t in array array['profiles','organizations','organization_members','trainer_students','access_periods','onboarding_progress','form_templates','form_questions','anamnesis_submissions','anamnesis_answers','audit_logs','exercises'] loop foreach role_name in array array['anon','authenticated'] loop if has_table_privilege(role_name, 'public.' || t, 'truncate') or has_table_privilege(role_name, 'public.' || t, 'references') or has_table_privilege(role_name, 'public.' || t, 'trigger') or has_table_privilege(role_name, 'public.' || t, 'maintain') then raise exception 'unsafe table grants on % for %', t, role_name; end if; end loop; end loop; end $$;
 create table public.synthetic_default_privilege_probe (id integer);
 do $$ begin if has_table_privilege('anon','public.synthetic_default_privilege_probe','truncate') or has_table_privilege('authenticated','public.synthetic_default_privilege_probe','maintain') then raise exception 'unsafe default privileges'; end if; end $$;
@@ -30,6 +31,22 @@ set local role authenticated;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 -- Exercise data are synthetic and scoped to the organization.
 insert into public.exercises(id,organization_id,name,instructions,created_by) values ('60000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Exercício sintético','Instruções sintéticas','00000000-0000-0000-0000-000000000001');
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004';
+insert into public.exercises(id,organization_id,name,created_by) values ('60000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','Exercício sintético B','00000000-0000-0000-0000-000000000004');
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+insert into public.training_plans(id,organization_id,student_id,created_by,title,version) values ('70000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001','Rascunho sintético',2);
+insert into public.training_plan_items(plan_id,exercise_id,position,sets,repetitions) values ('70000000-0000-0000-0000-000000000002','60000000-0000-0000-0000-000000000001',1,2,'10');
+delete from public.training_plans where id='70000000-0000-0000-0000-000000000002';
+insert into public.training_plans(id,organization_id,student_id,created_by,title,version) values ('70000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001','Treino sintético',1);
+insert into public.training_plan_items(id,plan_id,exercise_id,position,sets,repetitions) values ('80000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000001',1,3,'10');
+do $$ declare denied boolean:=false; begin begin insert into public.training_plan_items(plan_id,exercise_id,position,sets,repetitions) values ('70000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000002',2,2,'10'); exception when others then denied:=true; end; if not denied then raise exception 'cross-organization exercise accepted'; end if; end $$;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
+do $$ begin if (select count(*) from public.training_plans) <> 0 or (select count(*) from public.training_plan_items) <> 0 then raise exception 'student can see draft'; end if; end $$;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+update public.training_plans set status='published' where id='70000000-0000-0000-0000-000000000001';
+update public.exercises set instructions='Nova instrução sintética' where id='60000000-0000-0000-0000-000000000001';
+do $$ begin if (select exercise_instructions from public.training_plan_items where id='80000000-0000-0000-0000-000000000001') <> 'Instruções sintéticas' then raise exception 'published exercise snapshot changed'; end if; end $$;
+do $$ declare denied boolean:=false; begin begin update public.training_plan_items set sets=4 where id='80000000-0000-0000-0000-000000000001'; exception when others then denied:=true; end; if not denied and (select sets from public.training_plan_items where id='80000000-0000-0000-0000-000000000001') <> 3 then raise exception 'published workout was mutable'; end if; end $$;
 insert into public.form_templates(id,organization_id,title,version,created_by,description) values ('30000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Anamnese sintética',1,'00000000-0000-0000-0000-000000000001','Descrição sintética');
 insert into public.form_questions(id,template_id,position,prompt,question_type,required) values ('40000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001',1,'Pergunta sintética','text',true);
 update public.form_templates set status = 'published' where id='30000000-0000-0000-0000-000000000001';
@@ -38,7 +55,7 @@ do $$ declare denied boolean := false; begin
  if not denied then raise exception 'published question mutable'; end if;
 end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
-do $$ begin if (select count(*) from public.form_templates) <> 1 then raise exception 'student cannot read published template'; end if; if (select count(*) from public.exercises) <> 0 then raise exception 'student can read staff catalog'; end if; end $$;
+do $$ begin if (select count(*) from public.form_templates) <> 1 then raise exception 'student cannot read published template'; end if; if (select count(*) from public.exercises) <> 0 then raise exception 'student can read staff catalog'; end if; if (select count(*) from public.training_plan_items) <> 1 then raise exception 'student cannot read own published training'; end if; end $$;
 insert into public.onboarding_progress(organization_id,student_id,tour_step) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003',1);
 insert into public.anamnesis_submissions(id,organization_id,student_id,template_id) values ('50000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','30000000-0000-0000-0000-000000000001');
 do $$ declare denied boolean := false; begin
@@ -58,9 +75,9 @@ end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
 insert into public.exercises(organization_id,name,created_by) values ('10000000-0000-0000-0000-000000000001','Outro exercício sintético','00000000-0000-0000-0000-000000000002');
 do $$ declare denied boolean:=false; begin begin insert into public.exercises(organization_id,name,created_by) values ('20000000-0000-0000-0000-000000000001','Indevido','00000000-0000-0000-0000-000000000002'); exception when others then denied:=true; end; if not denied then raise exception 'cross-organization insert'; end if; end $$;
-do $$ begin if (select count(*) from public.exercises) <> 2 then raise exception 'trainer cannot read catalog'; end if; if (select count(*) from public.anamnesis_answers) <> 0 then raise exception 'trainer has direct clinical access'; end if; if public.get_anamnesis_submission_for_trainer('50000000-0000-0000-0000-000000000001') is null then raise exception 'linked trainer cannot review'; end if; end $$;
+do $$ begin if (select count(*) from public.exercises) <> 2 then raise exception 'trainer cannot read catalog'; end if; if (select count(*) from public.training_plans) <> 1 then raise exception 'trainer cannot read linked training'; end if; if (select count(*) from public.anamnesis_answers) <> 0 then raise exception 'trainer has direct clinical access'; end if; if public.get_anamnesis_submission_for_trainer('50000000-0000-0000-0000-000000000001') is null then raise exception 'linked trainer cannot review'; end if; end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004';
-do $$ begin if (select count(*) from public.form_templates) <> 0 or (select count(*) from public.exercises) <> 0 then raise exception 'cross-organization access'; end if; end $$;
+do $$ begin if (select count(*) from public.form_templates) <> 0 or (select count(*) from public.exercises) <> 1 or (select count(*) from public.training_plans) <> 0 then raise exception 'cross-organization access'; end if; end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 do $$ begin if (select count(*) from public.anamnesis_answers) <> 0 then raise exception 'owner has direct clinical access'; end if; if public.get_anamnesis_submission_for_owner('50000000-0000-0000-0000-000000000001') is null then raise exception 'owner cannot review'; end if; end $$;
 update public.exercises set archived_at=now() where id='60000000-0000-0000-0000-000000000001';
@@ -69,7 +86,7 @@ update public.form_templates set status='archived' where id='30000000-0000-0000-
 do $$ declare denied boolean:=false; begin begin update public.form_questions set prompt='alterada' where id='40000000-0000-0000-0000-000000000001'; exception when others then denied:=true; end; if not denied then raise exception 'archived question mutable'; end if; end $$;
 insert into public.access_periods(organization_id,student_id,starts_at,status,responsible_id,created_by,updated_by) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003',now()-interval '1 hour','blocked','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001');
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
-do $$ begin if (select count(*) from public.anamnesis_answers) <> 0 or (select count(*) from public.onboarding_progress) <> 0 then raise exception 'blocked student retained access'; end if; end $$;
+do $$ begin if (select count(*) from public.anamnesis_answers) <> 0 or (select count(*) from public.onboarding_progress) <> 0 or (select count(*) from public.training_plans) <> 0 then raise exception 'blocked student retained access'; end if; end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
 do $$ declare denied boolean:=false; begin begin perform public.get_anamnesis_submission_for_trainer('50000000-0000-0000-0000-000000000001'); exception when others then denied:=true; end; if not denied then raise exception 'trainer reviewed blocked student'; end if; end $$;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
@@ -79,4 +96,6 @@ update public.organization_members set archived_at=now() where profile_id='00000
 set local role authenticated;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
 do $$ begin if (select count(*) from public.anamnesis_answers) <> 0 or (select count(*) from public.onboarding_progress) <> 0 then raise exception 'archived member retained access'; end if; end $$;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+do $$ begin if (select count(*) from public.training_plans) <> 1 then raise exception 'owner lost training history'; end if; end $$;
 rollback;
