@@ -33,7 +33,7 @@ pnpm exec expo export --platform web
 
 ## Banco de dados
 
-O aplicativo usa o esquema do projeto Supabase de teste existente, cujo histórico é diferente da fundação originalmente criada neste repositório. `supabase/reconciliation/remote-history.sql` é uma cópia do SQL das 11 migrations já registradas nesse projeto, para reprodução local; as migrations complementares `20261029023003_reconcile_existing_anamnesis.sql`, `20261029030224_exercise_catalog.sql`, `20261029031147_restrict_client_table_privileges.sql` e `20261029031355_restrict_table_default_privileges.sql` e `20261029032358_training_prescriptions.sql` e `20261029033539_training_sessions.sql` foram aplicadas ao projeto de teste com essas versões.
+O aplicativo usa o esquema do projeto Supabase de teste existente, cujo histórico é diferente da fundação originalmente criada neste repositório. `supabase/reconciliation/remote-history.sql` é uma cópia do SQL das 11 migrations anteriores desse projeto, para reprodução local. Os demais arquivos numerados em `supabase/reconciliation` registram as migrations complementares aplicadas ao projeto de teste, em ordem de versão.
 
 Os arquivos originais em `supabase/migrations` foram preservados como histórico de uma fundação alternativa. **Não execute `supabase db push` com essa pasta contra o projeto de teste**: ela não corresponde ao histórico remoto e tentaria recriar objetos existentes. Para alterações futuras, compare o histórico remoto e crie migrations aditivas específicas para esse esquema; não reescreva migrations já aplicadas.
 
@@ -65,3 +65,7 @@ Owner e trainer podem cadastrar, editar e arquivar exercícios da própria organ
 ## Prescrição de treinos
 
 Owner e trainer podem criar fichas em rascunho para alunos autorizados, adicionar exercícios com séries e repetições e publicar a versão. Trainers trabalham somente com alunos vinculados e com acesso ativo; o aluno acessa apenas as próprias fichas publicadas quando seu acesso está ativo. Ao adicionar um exercício, a ficha guarda uma cópia do nome e das instruções para preservar o conteúdo publicado. Versões publicadas não podem ser editadas ou excluídas; podem ser arquivadas. O aluno pode iniciar uma sessão, marcar os exercícios realizados e concluí-la; as últimas sessões ficam no histórico da ficha. A equipe consulta o histórico pela função auditada, respeitando os vínculos e o acesso ativo.
+
+## Avaliações físicas
+
+Owner e trainer autorizado podem registrar medidas de peso, altura e cintura. Cada registro é imutável, não faz diagnóstico e contém somente as medidas preenchidas; as consultas da equipe são auditadas sem valores no log. O aluno ativo pode consultar as próprias avaliações. Fotografias e outros tipos de avaliação ainda não estão disponíveis.
