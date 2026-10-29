@@ -23,7 +23,7 @@ alter default privileges in schema public grant truncate, references, trigger, m
 \ir ../reconciliation/20261029051542_private_training_chat.sql
 \ir ../reconciliation/20261029052037_access_period_precedence.sql
 \ir ../reconciliation/20261029052507_record_student_access.sql
-\ir ../reconciliation/20261029053457_trainer_link_authorization.sql
+\ir ../reconciliation/20261029141446_trainer_link_authorization.sql
 do $$ declare t text; role_name text; begin foreach t in array array['profiles','organizations','organization_members','trainer_students','access_periods','onboarding_progress','form_templates','form_questions','anamnesis_submissions','anamnesis_answers','audit_logs','exercises'] loop foreach role_name in array array['anon','authenticated'] loop if has_table_privilege(role_name, 'public.' || t, 'truncate') or has_table_privilege(role_name, 'public.' || t, 'references') or has_table_privilege(role_name, 'public.' || t, 'trigger') or has_table_privilege(role_name, 'public.' || t, 'maintain') then raise exception 'unsafe table grants on % for %', t, role_name; end if; end loop; end loop; end $$;
 create table public.synthetic_default_privilege_probe (id integer);
 do $$ begin if has_table_privilege('anon','public.synthetic_default_privilege_probe','truncate') or has_table_privilege('authenticated','public.synthetic_default_privilege_probe','maintain') then raise exception 'unsafe default privileges'; end if; end $$;
